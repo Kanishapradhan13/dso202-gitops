@@ -1,0 +1,13 @@
+# bootstrap/argocd/argocd-rbac-cm-patch.yaml
+# DSO202 Assignment 4 - Task 2 / Task 6 (Listing 5): Argo CD RBAC. 'reviewer' is read-only
+# on the dso202 project. The logs line is enabled in Task 6 after the first test.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+data:
+  policy.default: ""
+  policy.csv: |
+    p, role:reviewer, applications, get, dso202/*, allow
+    p, role:reviewer, projects, get, dso202, allow
+    g, reviewer, role:reviewer

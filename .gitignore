@@ -1,0 +1,10 @@
+# .gitignore
+# DSO202 Assignment 4 - Listing 1
+# Purpose: keep key material and plaintext credentials out of Git (first commit).
+*.key
+*sealing-key*
+*.backup.yaml
+secrets-plain/
+*-plain.yaml
+*.log
+.DS_Store

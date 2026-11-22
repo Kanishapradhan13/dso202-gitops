@@ -1,0 +1,35 @@
+# charts/tasktracker/templates/smoke-test-job.yaml
+# DSO202 Assignment 4 - Task 5 (Listing 13): PostSync smoke test against the backend Service.
+{{- if .Values.smokeTest.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "tt.fullname" . }}-smoke-test
+  labels: {{- include "tt.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: smoke
+          image: {{ .Values.smokeTest.image }}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}
+          command:
+            - sh
+            - -c
+            - |
+              URL=http://{{ include "tt.fullname" . }}-backend-svc:8080/api/status
+              i=1
+              while [ $i -le {{ .Values.smokeTest.attempts }} ]; do
+                echo "attempt $i: GET $URL"
+                if wget -q -T 3 -O - "$URL"; then echo; echo "SMOKE TEST PASSED"; exit 0; fi
+                i=$((i+1)); sleep 3
+              done
+              echo "SMOKE TEST FAILED"; exit 1
+{{- end }}

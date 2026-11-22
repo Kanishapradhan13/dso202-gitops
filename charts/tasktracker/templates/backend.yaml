@@ -1,0 +1,54 @@
+# charts/tasktracker/templates/backend.yaml
+# DSO202 Assignment 4 - Task 1 (C4-C8): backend tier, sync wave 1, 120 s deadline.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tt.fullname" . }}-backend-svc
+  labels: {{- include "tt.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  {{- if .Values.backend.nodePort }}
+  type: NodePort
+  {{- end }}
+  selector: {{- include "tt.selector" (dict "ctx" . "tier" "backend") | nindent 4 }}
+  ports:
+    - port: 8080
+      targetPort: 8080
+      {{- if .Values.backend.nodePort }}
+      nodePort: {{ .Values.backend.nodePort }}
+      {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tt.fullname" . }}-backend
+  labels: {{- include "tt.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  progressDeadlineSeconds: 120
+  selector:
+    matchLabels: {{- include "tt.selector" (dict "ctx" . "tier" "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "tt.selector" (dict "ctx" . "tier" "backend") | nindent 8 }}
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: {{ include "tt.fullname" . }}-config
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+          resources: {{- toYaml .Values.backend.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5

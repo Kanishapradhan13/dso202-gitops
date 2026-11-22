@@ -1,0 +1,16 @@
+# cluster/kind-cluster.yaml
+# DSO202 Assignment 4 - Task 1 (cluster)
+# Purpose: single-node kind cluster; maps host ports to the dev NodePorts
+#          (30080 = dev frontend, 30090 = dev backend API used by the browser).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: dso202-gitops
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 30080
+        protocol: TCP
+      - containerPort: 30090
+        hostPort: 30090
+        protocol: TCP

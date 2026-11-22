@@ -1,0 +1,27 @@
+# argocd/applications/tasktracker-staging.yaml
+# DSO202 Assignment 4 - Task 5 (Listing 15)
+# Purpose: staging Task Tracker: pinned to a Git tag, NO automated sync (manual promotion).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tasktracker-staging
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: dso202
+  source:
+    repoURL: https://github.com/Kanishapradhan13/dso202-gitops.git
+    targetRevision: v1.0.0
+    path: charts/tasktracker
+    helm:
+      releaseName: tasktracker-staging
+      valueFiles:
+        - ../../environments/staging/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dso202-staging
+  syncPolicy:
+    syncOptions: [ServerSideApply=true]

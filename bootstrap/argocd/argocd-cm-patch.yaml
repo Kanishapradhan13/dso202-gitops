@@ -1,0 +1,11 @@
+# bootstrap/argocd/argocd-cm-patch.yaml
+# DSO202 Assignment 4 - Task 2 (Listing 4): 60 s Git polling, a local 'reviewer' account,
+# and Application health/resource tracking by annotation.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+data:
+  timeout.reconciliation: 60s
+  accounts.reviewer: login
+  application.resourceTrackingMethod: annotation

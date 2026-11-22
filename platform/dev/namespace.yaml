@@ -1,0 +1,8 @@
+# platform/dev/namespace.yaml
+# DSO202 Assignment 4 - Task 4 (Listing 11): namespace for the dev Task Tracker.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dso202-dev
+  labels:
+    environment: dev

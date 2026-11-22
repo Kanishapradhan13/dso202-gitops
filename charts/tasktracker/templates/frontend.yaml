@@ -1,0 +1,50 @@
+# charts/tasktracker/templates/frontend.yaml
+# DSO202 Assignment 4 - Task 1 (C4-C8): frontend tier, sync wave 2, NodePort from values.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tt.fullname" . }}-frontend-svc
+  labels: {{- include "tt.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  type: NodePort
+  selector: {{- include "tt.selector" (dict "ctx" . "tier" "frontend") | nindent 4 }}
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: {{ .Values.frontend.nodePort }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tt.fullname" . }}-frontend
+  labels: {{- include "tt.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  progressDeadlineSeconds: 120
+  selector:
+    matchLabels: {{- include "tt.selector" (dict "ctx" . "tier" "frontend") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "tt.selector" (dict "ctx" . "tier" "frontend") | nindent 8 }}
+    spec:
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          ports:
+            - containerPort: 8080
+          env:
+            - name: BACKEND_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "tt.fullname" . }}-config
+                  key: BACKEND_URL
+          resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            periodSeconds: 5

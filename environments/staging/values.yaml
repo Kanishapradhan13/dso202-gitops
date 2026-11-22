@@ -1,0 +1,9 @@
+# environments/staging/values.yaml
+# DSO202 Assignment 4 - Task 1: staging overrides (pinned to a tag; reached by port-forward).
+environment: staging
+config:
+  backendUrl: http://localhost:8082   # backend port-forward on the host
+frontend:
+  nodePort: 30081
+backend:
+  nodePort: 30091

@@ -1,0 +1,24 @@
+# bootstrap/root/root-app.yaml
+# DSO202 Assignment 4 - Task 3 (Listing 7): app-of-apps root. Watches argocd/ and delivers
+# every project and Application defined there. Applied by hand once.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/Kanishapradhan13/dso202-gitops.git
+    targetRevision: main
+    path: argocd
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [ServerSideApply=true]

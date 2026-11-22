@@ -1,0 +1,22 @@
+# bootstrap/root/platform-project.yaml
+# DSO202 Assignment 4 - Task 3 (Listing 6): AppProject 'platform' - the only project allowed
+# to target the argocd namespace. Applied by hand during bootstrap.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  description: Platform components and the app-of-apps root
+  sourceRepos:
+    - https://github.com/Kanishapradhan13/dso202-gitops.git
+    - https://bitnami.github.io/sealed-secrets
+  destinations:
+    - {server: https://kubernetes.default.svc, namespace: argocd}
+    - {server: https://kubernetes.default.svc, namespace: sealed-secrets}
+    - {server: https://kubernetes.default.svc, namespace: dso202-dev}
+    - {server: https://kubernetes.default.svc, namespace: dso202-staging}
+  clusterResourceWhitelist:
+    - {group: "*", kind: "*"}
+  namespaceResourceWhitelist:
+    - {group: "*", kind: "*"}

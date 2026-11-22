@@ -1,0 +1,24 @@
+# argocd/applications/platform-staging.yaml
+# DSO202 Assignment 4 - Task 4 (Listing 10, staging copy)
+# Purpose: platform objects for staging (follows main; workloads are what is pinned).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-staging
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/Kanishapradhan13/dso202-gitops.git
+    targetRevision: main
+    path: platform/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dso202-staging
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=false, ServerSideApply=true]

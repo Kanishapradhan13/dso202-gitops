@@ -1,0 +1,25 @@
+# platform/dev/quota-and-limits.yaml
+# DSO202 Assignment 4 - Task 4: namespace guardrails owned by the platform, not the chart.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tasktracker-quota
+  namespace: dso202-dev
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    pods: "10"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tasktracker-limits
+  namespace: dso202-dev
+spec:
+  limits:
+    - type: Container
+      default: {cpu: 200m, memory: 128Mi}
+      defaultRequest: {cpu: 25m, memory: 32Mi}

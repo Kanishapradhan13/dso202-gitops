@@ -1,0 +1,31 @@
+# argocd/projects/dso202.yaml
+# DSO202 Assignment 4 - Task 3 (Listing 8): least-privilege AppProject for the Task Tracker.
+# Workloads may only land in dso202-dev / dso202-staging, no cluster-scoped kinds, and only
+# the namespaced kinds the chart actually renders (ResourceQuota is deliberately absent).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dso202
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+spec:
+  description: Task Tracker workloads
+  sourceRepos:
+    - https://github.com/Kanishapradhan13/dso202-gitops.git
+  destinations:
+    - {server: https://kubernetes.default.svc, namespace: dso202-dev}
+    - {server: https://kubernetes.default.svc, namespace: dso202-staging}
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - {group: apps, kind: Deployment}
+    - {group: apps, kind: StatefulSet}
+    - {group: "", kind: Service}
+    - {group: "", kind: ConfigMap}
+    - {group: "", kind: ServiceAccount}
+    - {group: batch, kind: Job}
+  roles:
+    - name: reviewer
+      description: read-only access
+      policies:
+        - p, proj:dso202:reviewer, applications, get, dso202/*, allow

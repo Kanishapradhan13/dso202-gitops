@@ -1,0 +1,18 @@
+# charts/tasktracker/templates/configmap.yaml
+# DSO202 Assignment 4 - Task 1 (C2): per-tier configuration comes from values.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tt.fullname" . }}-config
+  labels: {{- include "tt.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  DB_HOST: {{ include "tt.fullname" . }}-db-headless
+  DB_PORT: {{ .Values.config.dbPort | quote }}
+  DB_NAME: {{ .Values.config.dbName | quote }}
+  POSTGRES_DB: {{ .Values.config.dbName | quote }}
+  APP_PORT: {{ .Values.config.appPort | quote }}
+  CORS_ORIGIN: {{ .Values.config.corsOrigin | quote }}
+  BACKEND_URL: {{ .Values.config.backendUrl | quote }}
+  ENVIRONMENT: {{ .Values.environment | quote }}

@@ -1,0 +1,6 @@
+# bootstrap/argocd/namespace.yaml
+# DSO202 Assignment 4 - Task 2 (Listing 2): namespace that hosts Argo CD.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd

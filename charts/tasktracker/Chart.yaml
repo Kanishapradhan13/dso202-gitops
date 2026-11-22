@@ -1,0 +1,9 @@
+# charts/tasktracker/Chart.yaml
+# DSO202 Assignment 4 - Task 1 (chart contract)
+# Purpose: Task Tracker chart (Assignment 3) reshaped for GitOps delivery.
+apiVersion: v2
+name: tasktracker
+description: 3-tier Task Tracker (Postgres StatefulSet, Node backend, nginx frontend)
+type: application
+version: 0.2.0
+appVersion: "1.0"

@@ -1,0 +1,24 @@
+# argocd/applications/platform-dev.yaml
+# DSO202 Assignment 4 - Task 4 (Listing 10)
+# Purpose: platform objects for dev: namespace, quota, limits, RBAC, sealed credentials (follows main).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-dev
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/Kanishapradhan13/dso202-gitops.git
+    targetRevision: main
+    path: platform/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dso202-dev
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=false, ServerSideApply=true]
