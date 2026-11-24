@@ -89,7 +89,7 @@ Each drill has a prediction, an action, an observation and a restore.
 ![drill 4](screenshots/t8-4-drill4-guardrail.png)
 
 ### Task 9 - Rebuild from Git
-Backed up the sealing key again and recorded the commit (`609c6e457366c96b6a98938c6ed4a475e603f212`, equal to `origin/main`). Deleted and recreated the cluster, created the `sealed-secrets` namespace and restored the key **before** the controller existed, installed Argo CD, applied the root app, and watched the Applications arrive in wave order. Re-logged in with the new admin password, synced staging manually, verified both environments (the database was re-seeded; a task was added in each), and backed the key up again. The SealedSecrets decrypted with the restored key (the controller log says it registered the existing private key).
+Backed up the sealing key again and recorded the commit (`68dc03768a4d34c7fbfa8bf85062b5c695fb00ac`, equal to `origin/main`). Deleted and recreated the cluster, created the `sealed-secrets` namespace and restored the key **before** the controller existed, installed Argo CD, applied the root app, and watched the Applications arrive in wave order. Re-logged in with the new admin password, synced staging manually, verified both environments (the database was re-seeded; a task was added in each), and backed the key up again. The SealedSecrets decrypted with the restored key (the controller log says it registered the existing private key).
 
 ![backup, delete, create](screenshots/t9-1-backup-delete-create.png)
 ![restore attempt](screenshots/t9-2-restore-key-install-argocd.png)
