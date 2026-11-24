@@ -486,3 +486,22 @@ NAME                  SYNC STATUS   HEALTH STATUS
 tasktracker-staging   Synced        Healthy
 ```
 Result matched the prediction: staging kept the drift (3/3, OutOfSync) until a manual sync restored 1 replica. Dev was unaffected.
+
+### Task 6 follow-up - Pods were not visible in the Argo CD tree
+
+While preparing the reviewer screenshot, the Argo CD UI showed no ReplicaSet or Pod nodes (even for admin), so there was nothing to open the LOGS tab on. Cause: the dso202 AppProject's namespaceResourceWhitelist did not list ReplicaSet or Pod, and Argo CD hides kinds the project does not allow. Fix (via Git, commit 60eea2b): added ReplicaSet and Pod to argocd/projects/dso202.yaml with a comment on each. ResourceQuota stays denied, so Task 8 Drill 4 is unaffected.
+```
+$ argocd app get tasktracker-dev -o tree   # after the fix
+
+KIND/NAME                                          STATUS  HEALTH   MESSAGE
+Service/tasktracker-dev-frontend-svc               Synced  Healthy  service/tasktracker-dev-frontend-svc serverside-applied
+Deployment/tasktracker-dev-backend                 Synced  Healthy  deployment.apps/tasktracker-dev-backend serverside-applied
+└─ReplicaSet/tasktracker-dev-backend-86496745fb            Healthy  
+  └─Pod/tasktracker-dev-backend-86496745fb-8xwrr           Healthy  
+Deployment/tasktracker-dev-frontend                Synced  Healthy  deployment.apps/tasktracker-dev-frontend serverside-applied
+└─ReplicaSet/tasktracker-dev-frontend-69f7c45989           Healthy  
+  └─Pod/tasktracker-dev-frontend-69f7c45989-2xjrw          Healthy  
+StatefulSet/tasktracker-dev-db                     Synced  Healthy  statefulset rolling update complete 1 pods at revision tasktracker-dev-db-7fb96fc9c5...
+└─Pod/tasktracker-dev-db-0                                 Healthy  
+ConfigMap/tasktracker-dev-config                   Synced           configmap/tasktracker-dev-config serverside-applied
+```
