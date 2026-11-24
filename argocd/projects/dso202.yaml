@@ -23,7 +23,9 @@ spec:
     - {group: "", kind: Service}
     - {group: "", kind: ConfigMap}
     - {group: "", kind: ServiceAccount}
-    - {group: batch, kind: Job}
+    - {group: batch, kind: Job}                 # smoke-test PostSync hook (Task 5)
+    - {group: apps, kind: ReplicaSet}           # child of Deployment; shown in the tree (Task 6)
+    - {group: "", kind: Pod}                    # child of workloads; needed so Pods and their logs are visible
   roles:
     - name: reviewer
       description: read-only access

@@ -366,3 +366,123 @@ http 204
 `Synced` compares the live objects with what Git renders: do they match? `Healthy` asks whether the live workload is actually working (Pods Ready, Deployments available, Jobs complete). They are independent. In this task: before the Secret was pushed, tasktracker-dev had its manifests applied, but its DB Pod sat in `CreateContainerConfigError` ("secret tasktracker-credentials not found"), so the Application was applied but `Progressing`, never Healthy. The reverse also happened: the StatefulSet reported OutOfSync while Healthy (volumeClaimTemplates defaults), fixed by setting `volumeMode: Filesystem` in the chart. A Synced-but-not-Healthy app is easy to provoke by pushing a bad image tag.
 
 Screenshots: docs/screenshots/task5-dev-tree.png
+
+## Task 6 - Argo CD access control
+
+```
+$ argocd account list
+NAME      ENABLED  CAPABILITIES
+admin     true     login
+reviewer  true     login
+
+# reviewer login: argocd login localhost:8080 --username reviewer --name reviewer  -> logged in
+
+# BEFORE enabling logs in Listing 5 (expected yes / no / no):
+$ argocd --argocd-context reviewer account can-i get applications dso202/tasktracker-dev
+yes
+$ argocd --argocd-context reviewer account can-i sync applications dso202/tasktracker-dev
+no
+$ argocd --argocd-context reviewer account can-i get logs dso202/tasktracker-dev
+no
+
+$ argocd --argocd-context reviewer proj get platform
+FATAL ... PermissionDenied desc = permission denied: projects, get, platform, sub: reviewer
+
+# After adding "p, role:reviewer, logs, get, dso202/*, allow" and re-running kubectl apply -k bootstrap/argocd --server-side --force-conflicts:
+$ argocd --argocd-context reviewer account can-i get applications dso202/tasktracker-dev
+yes
+$ argocd --argocd-context reviewer account can-i sync applications dso202/tasktracker-dev
+no
+$ argocd --argocd-context reviewer account can-i get logs dso202/tasktracker-dev
+yes
+
+$ argocd account list (admin session restored)
+argocd/platform-dev
+argocd/platform-staging
+argocd/root
+argocd/sealed-secrets
+argocd/tasktracker-dev
+argocd/tasktracker-staging
+```
+
+### Q4
+Argo CD RBAC (argocd-rbac-cm, `policy.csv`, plus AppProject roles) controls what a user can do *through Argo CD*: view, sync, override, delete applications, read logs, manage projects, repos and clusters. Kubernetes RBAC (Assignment 2: Role/RoleBinding/ClusterRole, in the cluster, here platform/<env>/rbac.yaml) controls what a Kubernetes identity can do against the Kubernetes API (kubectl, ServiceAccounts, Pods). They are separate layers: Argo CD's application controller uses its own ServiceAccount with broad Kubernetes rights, and a human's Argo CD permissions are enforced by the Argo CD API server, not by Kubernetes. If the organisation's IdP were connected through SSO (descriptor 4.4.2), the users would no longer be local accounts (`accounts.reviewer` in argocd-cm); `policy.csv` would map IdP groups instead of local usernames, for example `g, <idp-group-name>, role:reviewer`, with `scopes` set in argocd-rbac-cm so group claims are read. The roles and `p,` rules would stay the same, only the `g,` subject lines change. SSO was not configured here.
+
+Screenshot: docs/screenshots/task6-reviewer-logs.png
+
+## Task 8 - Drift, pruning and guardrails
+
+### Drill 1 - self-heal in dev
+```
+PREDICTION: dev has selfHeal=true, so Argo CD will revert replicas 3 -> 1 within seconds.
+
+$ kubectl get deploy tasktracker-dev-backend -n dso202-dev
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+tasktracker-dev-backend   1/1     1            1           24m
+
+$ kubectl scale deploy tasktracker-dev-backend -n dso202-dev --replicas=3
+deployment.apps/tasktracker-dev-backend scaled
+t+3s: ready=1/3 desired(spec)=3  app=Synced
+t+6s: ready=1/3 desired(spec)=3  app=OutOfSync
+t+9s: ready=1/1 desired(spec)=1  app=Synced
+t+12s: ready=1/1 desired(spec)=1  app=Synced
+t+15s: ready=1/1 desired(spec)=1  app=Synced
+t+18s: ready=1/1 desired(spec)=1  app=Synced
+t+21s: ready=1/1 desired(spec)=1  app=Synced
+t+24s: ready=1/1 desired(spec)=1  app=Synced
+
+$ kubectl get deploy,pods -n dso202-dev
+NAME                                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/tasktracker-dev-backend    1/1     1            1           24m
+deployment.apps/tasktracker-dev-frontend   1/1     1            1           24m
+
+NAME                                            READY   STATUS        RESTARTS   AGE
+pod/tasktracker-dev-backend-86496745fb-8xwrr    1/1     Running       0          24m
+pod/tasktracker-dev-backend-86496745fb-fsqgt    1/1     Terminating   0          26s
+pod/tasktracker-dev-backend-86496745fb-z2v9p    1/1     Terminating   0          26s
+pod/tasktracker-dev-db-0                        1/1     Running       0          42h
+pod/tasktracker-dev-frontend-69f7c45989-2xjrw   1/1     Running       0          24m
+```
+Result matched the prediction: the hand edit was reverted by self-heal within about 9 seconds (OutOfSync for roughly one poll).
+
+### Drill 2 - drift in staging (no automated sync)
+```
+PREDICTION: staging has no automated sync, so replicas stay at 3 and the app turns OutOfSync until a manual sync.
+
+$ kubectl scale deploy tasktracker-staging-backend -n dso202-staging --replicas=3
+deployment.apps/tasktracker-staging-backend scaled
+
+$ kubectl get deploy tasktracker-staging-backend -n dso202-staging (after 40 s)
+NAME                          READY   UP-TO-DATE   AVAILABLE   AGE
+tasktracker-staging-backend   3/3     3            3           13m
+
+$ kubectl get app tasktracker-staging -n argocd
+NAME                  SYNC STATUS   HEALTH STATUS
+tasktracker-staging   OutOfSync     Healthy
+
+$ argocd app diff tasktracker-staging
+
+===== apps/Deployment dso202-staging/tasktracker-staging-backend ======
+112c112
+<   replicas: 3
+---
+>   replicas: 1
+
+$ argocd app sync tasktracker-staging
+2026-11-24T19:18:36+06:00   apps  Deployment   dso202-staging  tasktracker-staging-backend       OutOfSync  Healthy              
+2026-11-24T19:18:36+06:00   apps  Deployment   dso202-staging  tasktracker-staging-frontend        Synced   Healthy              
+2026-11-24T19:18:40+06:00   apps  Deployment  dso202-staging  tasktracker-staging-backend    Synced  Healthy              
+2026-11-24T19:18:42+06:00   apps  Deployment   dso202-staging  tasktracker-staging-backend        Synced  Healthy              deployment.apps/tasktracker-staging-backend serverside-applied
+2026-11-24T19:18:44+06:00   apps  Deployment  dso202-staging  tasktracker-staging-frontend        Synced  Healthy              deployment.apps/tasktracker-staging-frontend serverside-applied
+Phase:              Succeeded
+Message:            successfully synced (no more tasks)
+apps   Deployment   dso202-staging  tasktracker-staging-backend       Synced     Healthy            deployment.apps/tasktracker-staging-backend serverside-applied
+apps   Deployment   dso202-staging  tasktracker-staging-frontend      Synced     Healthy            deployment.apps/tasktracker-staging-frontend serverside-applied
+
+$ kubectl get deploy tasktracker-staging-backend -n dso202-staging && kubectl get app tasktracker-staging -n argocd
+NAME                          READY   UP-TO-DATE   AVAILABLE   AGE
+tasktracker-staging-backend   1/1     1            1           14m
+NAME                  SYNC STATUS   HEALTH STATUS
+tasktracker-staging   Synced        Healthy
+```
+Result matched the prediction: staging kept the drift (3/3, OutOfSync) until a manual sync restored 1 replica. Dev was unaffected.
