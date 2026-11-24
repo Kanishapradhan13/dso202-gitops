@@ -505,34 +505,3 @@ StatefulSet/tasktracker-dev-db                     Synced  Healthy  statefulset 
 └─Pod/tasktracker-dev-db-0                                 Healthy  
 ConfigMap/tasktracker-dev-config                   Synced           configmap/tasktracker-dev-config serverside-applied
 ```
-
-### Drill 3 - pruning
-```
-PREDICTION: platform-dev (automated, prune) will create ConfigMap prune-drill after the push, and delete it once the file is removed from Git.
-$ kubectl get cm prune-drill -n dso202-dev -o yaml | head -12
-apiVersion: v1
-data:
-  purpose: Added to Git, then removed from Git; prune should delete it from the cluster.
-kind: ConfigMap
-metadata:
-  annotations:
-    argocd.argoproj.io/tracking-id: platform-dev:/ConfigMap:dso202-dev/prune-drill
-  creationTimestamp: "2026-11-24T16:01:43Z"
-  name: prune-drill
-  namespace: dso202-dev
-  resourceVersion: "24919"
-  uid: f4377602-d467-476a-84bd-2959785b0836
-$ kubectl get app platform-dev -n argocd
-NAME           SYNC STATUS   HEALTH STATUS
-platform-dev   Synced        Healthy
-$ kubectl get cm prune-drill -n dso202-dev  # after removal from Git
-Error from server (NotFound): configmaps "prune-drill" not found
-$ kubectl get app platform-dev -n argocd
-NAME           SYNC STATUS   HEALTH STATUS
-platform-dev   Synced        Healthy
-$ kubectl get cm -n dso202-dev
-NAME                     DATA   AGE
-kube-root-ca.crt         1      45h
-tasktracker-dev-config   8      45h
-```
-Result matched the prediction: the ConfigMap appeared after the commit adding it, and Argo CD pruned it after the commit removing it (automated sync with prune on platform-dev). The tracking-id annotation shows which Application owns the object, which is how prune knows what it may delete.
