@@ -202,3 +202,167 @@ Orphaned Resources:          disabled
 ```
 
 Screenshot: docs/screenshots/task3-root-tree.png
+
+## Task 4 - Platform objects and Sealed Secrets
+
+```
+$ kubectl get app sealed-secrets -n argocd; kubectl get pods -n sealed-secrets
+NAME             SYNC STATUS   HEALTH STATUS
+sealed-secrets   Synced        Healthy
+NAME                                        READY   STATUS    RESTARTS      AGE
+sealed-secrets-controller-dddc94564-n6qs4   1/1     Running   1 (28m ago)   42h
+```
+
+```
+$ ls -l ../dso202-keys/sealing-key.backup.yaml   # backed up BEFORE sealing; contents never recorded
+-rw-------@ 1 kanisha13  staff  7095 Nov 23 00:26 ../dso202-keys/sealing-key.backup.yaml
+```
+
+```
+$ kubectl get sealedsecret,secret -n dso202-dev; kubectl get sealedsecret,secret -n dso202-staging
+NAME                                               STATUS   SYNCED   AGE
+sealedsecret.bitnami.com/tasktracker-credentials            True     13m
+
+NAME                             TYPE     DATA   AGE
+secret/tasktracker-credentials   Opaque   4      13m
+NAME                                               STATUS   SYNCED   AGE
+sealedsecret.bitnami.com/tasktracker-credentials            True     13m
+
+NAME                             TYPE     DATA   AGE
+secret/tasktracker-credentials   Opaque   4      13m
+```
+
+```
+$ git log --all -p -S"$(grep ^DB_PASSWORD= secrets-plain/dev.env | cut -d= -f2)" --oneline | wc -l   # plaintext dev password in history: 0 lines
+       0
+```
+
+```
+$ git log --all -p -S"$(grep ^DB_PASSWORD= secrets-plain/staging.env | cut -d= -f2)" --oneline | wc -l   # plaintext staging password in history: 0 lines
+       0
+```
+
+```
+$ git status --short --ignored
+ M docs/evidence.md
+!! .DS_Store
+!! docs/.DS_Store
+!! secrets-plain/
+```
+
+### Q2
+Strict scope binds each SealedSecret to one namespace *and* one Secret name. It prevents someone who can read the sealed YAML (the public repo) from re-targeting it: copying the dev SealedSecret into another namespace, or renaming it, makes the controller refuse to decrypt it, so a dev credential cannot be harvested by creating a SealedSecret in a namespace someone else controls. What is lost is flexibility: renaming the Secret or moving it to another namespace means re-sealing it. If the sealing key is lost, every existing SealedSecret becomes permanently undecryptable (only the private key can decrypt). The recovery is to restore the key backup before the controller starts, or, if there is no backup, to let the controller generate a new key, re-seal every secret from the original plaintext, commit, and rotate the underlying credentials.
+
+## Task 5 - Deliver the workloads
+
+```
+$ git log --oneline --decorate -4; git ls-remote --tags origin
+901b126 (HEAD -> main, tag: v1.0.0, origin/main, origin/HEAD) Task 5: smoke test, fix StatefulSet volumeMode drift
+80418b6 Task 4: sealed credentials and Tasks 1-3 evidence
+97f9340 first commit
+901b126300009d2f2a07648441565a18a2d49f78	refs/tags/v1.0.0
+```
+
+```
+$ kubectl get applications -n argocd
+NAME                  SYNC STATUS   HEALTH STATUS
+platform-dev          Synced        Healthy
+platform-staging      Synced        Healthy
+root                  Synced        Healthy
+sealed-secrets        Synced        Healthy
+tasktracker-dev       Synced        Healthy
+tasktracker-staging   Synced        Healthy
+```
+
+```
+$ kubectl get pods -n dso202-dev --sort-by=.metadata.creationTimestamp -o custom-columns=NAME:.metadata.name,CREATED:.metadata.creationTimestamp,READY:.status.containerStatuses[0].ready
+(eval):1: no matches found: custom-columns=NAME:.metadata.name,CREATED:.metadata.creationTimestamp,READY:.status.containerStatuses[0].ready
+```
+
+Smoke-test log (PostSync hook, captured during sync):
+```
+attempt 1: GET http://tasktracker-dev-backend-svc:8080/api/status
+{"status":"ok","db":"connected"}
+SMOKE TEST PASSED
+```
+
+```
+$ argocd app get tasktracker-dev | sed -n 1,16p
+Name:               argocd/tasktracker-dev
+Project:            dso202
+Server:             https://kubernetes.default.svc
+Namespace:          dso202-dev
+URL:                https://localhost:8080/applications/tasktracker-dev
+Source:
+- Repo:             https://github.com/Kanishapradhan13/dso202-gitops.git
+  Target:           main
+  Path:             charts/tasktracker
+  Helm Values:      ../../environments/dev/values.yaml
+SyncWindow:         Sync Allowed
+Sync Policy:        Automated (Prune)
+Sync Status:        Synced to main (901b126)
+Health Status:      Healthy
+
+GROUP  KIND         NAMESPACE   NAME                          STATUS     HEALTH   HOOK      MESSAGE
+```
+
+```
+$ argocd app get tasktracker-staging | sed -n 1,16p
+Name:               argocd/tasktracker-staging
+Project:            dso202
+Server:             https://kubernetes.default.svc
+Namespace:          dso202-staging
+URL:                https://localhost:8080/applications/tasktracker-staging
+Source:
+- Repo:             https://github.com/Kanishapradhan13/dso202-gitops.git
+  Target:           v1.0.0
+  Path:             charts/tasktracker
+  Helm Values:      ../../environments/staging/values.yaml
+SyncWindow:         Sync Allowed
+Sync Policy:        Manual
+Sync Status:        Synced to v1.0.0 (901b126)
+Health Status:      Healthy
+
+GROUP  KIND         NAMESPACE       NAME                              STATUS     HEALTH   HOOK      MESSAGE
+```
+
+```
+$ argocd app history tasktracker-dev
+SOURCE  https://github.com/Kanishapradhan13/dso202-gitops.git
+ID      DATE                           REVISION
+0       2026-11-24 18:54:44 +0600 +06  main (97f9340)
+1       2026-11-24 18:54:59 +0600 +06  main (80418b6)
+2       2026-11-24 19:04:14 +0600 +06  main (901b126)
+3       2026-11-24 19:04:41 +0600 +06  main (901b126)
+```
+
+### Root state before and after the first manual staging sync
+
+Before: root Synced/Healthy at main (901b126); tasktracker-staging OutOfSync/Missing. After: root Synced/Healthy at main (901b126); tasktracker-staging Synced/Healthy. root never changed: it tracks the Application objects in Git, not the workloads those Applications deliver, and a manual staging sync changes only the workloads.
+
+### CRUD cycle (dev http://localhost:30080 stack, staging via port-forward 8081/8082)
+```
+=== dev CRUD (via http://localhost:30090/api/tasks) ===
+CREATE:
+{"id":5,"title":"GitOps dev task","description":"created via API","status":"pending","created_at":"2026-11-24T13:05:58.138Z"}
+READ:
+{"id":5,"title":"GitOps dev task","description":"created via API","status":"pending","created_at":"2026-11-24T13:05:58.138Z"}
+UPDATE:
+{"id":5,"title":"GitOps task","description":"updated","status":"done","created_at":"2026-11-24T13:05:58.138Z"}
+DELETE:
+http 204
+=== staging CRUD (via http://localhost:8082/api/tasks) ===
+CREATE:
+{"id":4,"title":"GitOps staging task","description":"created via API","status":"pending","created_at":"2026-11-24T13:05:58.449Z"}
+READ:
+{"id":4,"title":"GitOps staging task","description":"created via API","status":"pending","created_at":"2026-11-24T13:05:58.449Z"}
+UPDATE:
+{"id":4,"title":"GitOps task","description":"updated","status":"done","created_at":"2026-11-24T13:05:58.449Z"}
+DELETE:
+http 204
+```
+
+### Q3
+`Synced` compares the live objects with what Git renders: do they match? `Healthy` asks whether the live workload is actually working (Pods Ready, Deployments available, Jobs complete). They are independent. In this task: before the Secret was pushed, tasktracker-dev had its manifests applied, but its DB Pod sat in `CreateContainerConfigError` ("secret tasktracker-credentials not found"), so the Application was applied but `Progressing`, never Healthy. The reverse also happened: the StatefulSet reported OutOfSync while Healthy (volumeClaimTemplates defaults), fixed by setting `volumeMode: Filesystem` in the chart. A Synced-but-not-Healthy app is easy to provoke by pushing a bad image tag.
+
+Screenshots: docs/screenshots/task5-dev-tree.png

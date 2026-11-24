@@ -10,4 +10,5 @@ data:
   policy.csv: |
     p, role:reviewer, applications, get, dso202/*, allow
     p, role:reviewer, projects, get, dso202, allow
+    p, role:reviewer, logs, get, dso202/*, allow
     g, reviewer, role:reviewer
